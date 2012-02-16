@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.fileguard.watcher</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Extra/FileGuard/Daemon/daemon</string>
+    </array>
+    <key>RunAtLoad</key>
+    <false/>
+    <key>WatchPaths</key>
+    <array>
+        <string>/System/Library/Extensions/AppleIntelCPUPowerManagement.kext/Contents/MacOS/AppleIntelCPUPowerManagement</string>
+        <string>/System/Library/Extensions/AppleHDA.kext/Contents/MacOS/AppleHDA</string>
+        <string>/System/Library/Extensions/AppleHDA.kext/Contents/Resources/Platforms.xml</string>
+        <string>/System/Library/Extensions/AppleHDA.kext/Contents/Resources/layout892.xml</string>
+        <string>/System/Library/Extensions/AppleHDA.kext/Contents/PlugIns/AppleHDAHardwareConfigDriver.kext/Contents/Info.plist</string>
+        <string>/System/Library/Extensions/ATI6000Controller.kext/Contents/MacOS/ATI6000Controller</string>
+        <string>/System/Library/Extensions/IONetworkingFamily.kext/Contents/PlugIns/AppleIntelE1000e.kext</string>
+        <string>/System/Library/Extensions/FakeSMC.kext/Contents/Info.plist</string>
+    </array>
+</dict>
+</plist>

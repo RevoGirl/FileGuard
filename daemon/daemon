@@ -1,0 +1,195 @@
+#!/bin/sh
+#
+# Script (daemon) to restore files from the FileGuard storage, after they
+# have been removed and/or replaced by the OS X installer.
+#
+# Version 0.6 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+#
+
+#
+# Note: We <em>have</em> to do it the way I do it, this due to a possible race 
+# condition – stubborn among you may e-mail Quinn <eskimo1@apple.com> but I
+# won't be surprised when you get pissed off by him (just trust me on this one).
+#
+
+#set -x # Used for tracing errors
+
+
+#============================== CONFIGURATION VAR ===============================
+
+LAYOUT=892 # We need to read this from a (configuration) file!
+
+AUTOMATIC_SYNC=1 # New experimental feature (copies missing files to FileGuard).
+
+#================================= GLOBAL VARS ==================================
+
+FILEGUARD_FILES="/Extra/FileGuard/Files" # Do <em>not</em> add a forward slash!
+FILEGUARD_EXTENSIONS="/Extra/FileGuard/Files/System/Library/Extensions/"
+EXTENSIONS_DIR="/System/Library/Extensions/"
+
+#=============================== LOCAL FUNCTIONS ================================
+
+function getChecksum()
+{
+   local result=`/sbin/md5 -q $1`
+   echo "$result"
+}
+
+#--------------------------------------------------------------------------------
+
+function doDirectoryDiff()
+{
+  local result=`/usr/bin/diff -rq $1 $2 > /tmp/fgscratch`
+  
+  # Check filesize (-s) of our scratch file.
+  if [ -s "/tmp/fgscratch" ];
+      then
+          echo 1 # Directory content is different.
+      else
+          echo 0 # Directory content is the same (empty scratch file).
+  fi
+}
+
+#--------------------------------------------------------------------------------
+
+function shouldRestore()
+{
+  # Plain ordinary files can be checked with md5 (unlike directories).
+  if [ -f $1 ]; then
+      if [ $(getChecksum $1) == $(getChecksum $2) ];
+          then
+              echo 0 # "Same checksum, no restore required."
+          else
+              echo 1 # "Different checksum, restore required."
+      fi
+  elif [ -d $1 ]; then
+      if [ $(doDirectoryDiff $1 $2) -eq 1 ]; 
+          then
+              echo 1 # Directory content is different.
+          else
+              echo 0 # Directory content is the same.
+      fi
+  fi
+}
+
+#--------------------------------------------------------------------------------
+
+function restoreFromFileGuard()
+{
+  # Neat little trick to remove /*.kext from the trailing end of the target path
+  local path=${2%/*.kext}
+
+  # Sigh. Can't even remember if we need this or not.
+  #if [ $(fileExists $path) -eq 0 ]; then
+      #path=${2%/*}
+  #fi
+
+  #
+  # Commented out to protect people from running into problems
+  #
+  #/bin/cp -Rp $1 $path
+
+  echo "File restored from FileGuard: $2"
+}
+
+#-------------------------------------------------------------------------------
+
+function fileExists()
+{
+  if [ -e $1 ]; # file (-f) or directory (-d) 
+      then
+          echo 1 # "File exists"
+      else
+          echo 0 # "File does not exist"
+  fi
+}
+
+#-------------------------------------------------------------------------------
+
+function addFileToStorage()
+{
+  # Strip filename from path.
+  local TARGET_PATH=${1%/*}
+
+  # Check target path (directory).
+  if [ ! -d $TARGET_PATH ]; then
+      # Target path not found (add directory).
+      `/usr/bin/sudo /bin/mkdir -p $TARGET_PATH`
+  fi
+
+  if [ -s $2 ];
+      then
+          # Copy file from the OS X location to /Extra/FileGuard/Files/..
+          `/usr/bin/sudo /bin/cp -Rp $2 $1`
+
+          echo "NOTICE: File added to FileGuard: $1"
+      else
+          echo "NOTICE: File with zero length skipped: $1"
+  fi
+}
+
+#-------------------------------------------------------------------------------
+
+function checkFile()
+{
+  local PATH=$1
+
+  # A path starting with a forward slash must be followed (full path given).
+  if [[ $PATH =~ ^/ ]]; 
+      then # Full path given
+          local SOURCE_FILE=${FILEGUARD_FILES}$PATH
+          local TARGET_FILE=$PATH
+      else # Assume Extensions directory
+          local SOURCE_FILE=${FILEGUARD_EXTENSIONS}$PATH
+          local TARGET_FILE=${EXTENSIONS_DIR}$PATH
+  fi
+
+  if [ $(fileExists $SOURCE_FILE) -eq 1 ]; 
+      then
+          if [ $(fileExists $TARGET_FILE) -eq 1 ]; 
+              then
+                  if [ $(shouldRestore $SOURCE_FILE $TARGET_FILE) -eq 1 ]; 
+                      then
+                          echo $(restoreFromFileGuard $SOURCE_FILE $TARGET_FILE)
+                      else
+                          echo "File checked: $TARGET_FILE"
+                  fi
+              else
+                  echo $(restoreFromFileGuard $SOURCE_FILE $TARGET_FILE)
+          fi
+      else
+          echo "ERROR: File unavailable from FileGuard: $SOURCE_FILE"
+
+          if [ $AUTOMATIC_SYNC -eq 1 ]; then
+              echo $(addFileToStorage $SOURCE_FILE $TARGET_FILE)
+          fi
+  fi
+}
+
+#================================================================================
+
+echo "\nFileGuard daemon - file check started on" `date "+%d-%m-%Y @ %H:%M:%S"`
+echo "--------------------------------------------------------------"
+
+echo $(checkFile "/boot")
+echo $(checkFile "/usr/standalone/i386/boot")
+
+echo $(checkFile "AppleHDA.kext/Contents/MacOS/AppleHDA")
+echo $(checkFile "AppleHDA.kext/Contents/Resources/layout${LAYOUT}.xml")
+echo $(checkFile "AppleHDA.kext/Contents/Resources/Platforms.xml")
+echo $(checkFile "AppleHDA.kext/Contents/PlugIns/AppleHDAHardwareConfigDriver.kext/Contents/Info.plist")
+echo $(checkFile "AppleIntelCPUPowerManagement.kext/Contents/MacOS/AppleIntelCPUPowerManagement")
+
+echo $(checkFile "ATI6000Controller.kext/Contents/MacOS/ATIController")
+
+echo $(checkFile "IONetworkingFamily.kext/Contents/PlugIns/AppleIntelE1000e.kext")
+echo $(checkFile "IONetworkingFamily.kext/Contents/PlugIns/AppleYukon2.kext")
+
+echo $(checkFile "FakeSMC.kext")
+
+echo "--------------------------------------------------------------"
+echo "FileGuard daemon - file check finished\n"
+
+#================================================================================
+
+exit 0
