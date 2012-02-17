@@ -15,13 +15,13 @@ LAYOUT=892 # We need to read this from ioreg output.
 
 #================================= GLOBAL VARS ==================================
 
-fgDaemonDir=/Extra2/FileGuard/Daemon
+fgDaemonDir=/Extra/FileGuard/Daemon
 
-fgDirectories=( /Extra2 FileGuard Files System Library Extensions )
+fgDirectories=( /Extra FileGuard Files System Library Extensions )
 
 EXTENSIONS_DIR=/System/Library/Extensions/
 
-FILEGUARD_FILES=/Extra2/FileGuard/Files  # Do <em>not</em> add a forward slash!
+FILEGUARD_FILES=/Extra/FileGuard/Files  # Do <em>not</em> add a forward slash!
 FILEGUARD_EXTENSIONS=${FILEGUARD_FILES}$EXTENSIONS_DIR
 
 #--------------------------------------------------------------------------------
@@ -191,7 +191,7 @@ function main()
   echo "------------------------------------------------------------"
   echo "Done\n"
 
-  #cd /Extra2
+  cd /Extra
 }
 
 #==================================== START =====================================
