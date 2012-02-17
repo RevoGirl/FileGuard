@@ -161,7 +161,7 @@ function _checkDirectories()
 #
 #--------------------------------------------------------------------------------
 
-function isRoot()
+function _isRoot()
 {
   if [ "$(id -u)" != "0" ]; then
       echo "This script must be run as root" 1>&2
@@ -173,7 +173,7 @@ function isRoot()
 
 #--------------------------------------------------------------------------------
 
-function main()
+function _main()
 {
   _setLayoutID $1
   _checkDirectories
@@ -196,8 +196,8 @@ function main()
 
 #==================================== START =====================================
 
-if [ $(isRoot) ]; then
-  main $1
+if [ $(_isRoot) ]; then
+  _main $1
 fi
 
 #================================================================================
