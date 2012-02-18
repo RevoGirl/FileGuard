@@ -48,6 +48,13 @@ fgWatchTargets[9]=IONetworkingFamily.kext/Contents/PlugIns/AppleIntelE1000e.kext
 fgWatchTargets[10]=IONetworkingFamily.kext/Contents/PlugIns/AppleYukon2.kext
 
 #=============================== LOCAL FUNCTIONS ================================
+function _getcodec()
+{
+  codec=`echo ${5:3:2}${5:1:2}`
+	LAYOUT="$((0x$codec))"
+}
+
+
 
 function _fileExists()
 {
@@ -120,16 +127,16 @@ function _checkWatchTarget()
 
 function _setLayoutID()
 {
-  if [ $# == 1 ];
-      then
+if [ $# == 1 ];
+    then
         LAYOUT=$1
-        echo "Using the given layout ($1) for AppleHDA.\n"
+        echo "Using the given layout ($1) for AppleHDA."
     else
-        LAYOUT=892
-        echo "Using the default layout (892) for AppleHDA.\n"
-  fi
+        LayoutID=`ioreg -p IODeviceTree -n HDEF@1B | grep layout-id`
+        _getcodec $LayoutID
+        echo "Using the BUILTIN layout $LAYOUT for AppleHDA."
+fi
 }
-
 #--------------------------------------------------------------------------------
 #
 # Check the FileGuard directory structure (adds missing directories).
