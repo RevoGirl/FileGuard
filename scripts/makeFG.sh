@@ -4,14 +4,12 @@
 # Script (makeFG.sh) to create the FileGuard directory structure, 
 # and to backup certain essential files required by OS X.
 #
-# Version 0.7 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.8 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+#
+# Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
 
 #set -x # Used for tracing errors
-
-#============================== CONFIGURATION VAR ===============================
-
-LAYOUT=892 # We need to read this from ioreg output.
 
 #================================= GLOBAL VARS ==================================
 
@@ -24,30 +22,38 @@ EXTENSIONS_DIR=/System/Library/Extensions/
 FILEGUARD_FILES=/Extra/FileGuard/Files  # Do <em>not</em> add a forward slash!
 FILEGUARD_EXTENSIONS=${FILEGUARD_FILES}$EXTENSIONS_DIR
 
-#--------------------------------------------------------------------------------
-#
-# This is where you add your watch targets (keep an eye on the index)!
-#
-#--------------------------------------------------------------------------------
-
-fgWatchTargets[0]=/boot
-fgWatchTargets[1]=/usr/standalone/i386/boot
-
-fgWatchTargets[2]=AppleHDA.kext/Contents/MacOS/AppleHDA
-fgWatchTargets[3]=AppleHDA.kext/Contents/Resources/layout${LAYOUT}.xml
-fgWatchTargets[4]=AppleHDA.kext/Contents/Resources/Platforms.xml
-fgWatchTargets[5]=AppleHDA.kext/Contents/PlugIns/AppleHDAHardwareConfigDriver.kext/Contents/Info.plist
-
-fgWatchTargets[6]=AppleIntelCPUPowerManagement.kext/Contents/MacOS/AppleIntelCPUPowerManagement
-
-fgWatchTargets[7]=ATI6000Controller.kext/Contents/MacOS/ATI6000Controller
-
-fgWatchTargets[8]=FakeSMC.kext
-
-fgWatchTargets[9]=IONetworkingFamily.kext/Contents/PlugIns/AppleIntelE1000e.kext
-fgWatchTargets[10]=IONetworkingFamily.kext/Contents/PlugIns/AppleYukon2.kext
-
 #=============================== LOCAL FUNCTIONS ================================
+
+function _initWatchTargets()
+{
+  #------------------------------------------------------------------------------
+  # Temporarily solution to setup the watch targets.
+  #
+  # Notes: Will be moved to: com.fileguard.config.plist and read in with help of 
+  #        `defaults read /Extra/FileGuard/com.fileguard.config.plist WatchPaths`
+  #
+  #        A new, yet to be developed, script will enable you to: list, add and 
+  #        remove targets from a terminal window - no more hand editing required. 
+  #------------------------------------------------------------------------------
+  fgWatchTargets[0]=/boot
+  fgWatchTargets[1]=/usr/standalone/i386/boot
+
+  fgWatchTargets[2]=AppleHDA.kext/Contents/MacOS/AppleHDA
+  fgWatchTargets[3]=AppleHDA.kext/Contents/Resources/layout${LAYOUT}.xml
+  fgWatchTargets[4]=AppleHDA.kext/Contents/Resources/Platforms.xml
+  fgWatchTargets[5]=AppleHDA.kext/Contents/PlugIns/AppleHDAHardwareConfigDriver.kext/Contents/Info.plist
+
+  fgWatchTargets[6]=AppleIntelCPUPowerManagement.kext/Contents/MacOS/AppleIntelCPUPowerManagement
+
+  fgWatchTargets[7]=ATI6000Controller.kext/Contents/MacOS/ATI6000Controller
+
+  fgWatchTargets[8]=FakeSMC.kext
+
+  fgWatchTargets[9]=IONetworkingFamily.kext/Contents/PlugIns/AppleIntelE1000e.kext
+  fgWatchTargets[10]=IONetworkingFamily.kext/Contents/PlugIns/AppleYukon2.kext
+}
+
+#--------------------------------------------------------------------------------
 
 function _fileExists()
 {
@@ -125,8 +131,16 @@ function _setLayoutID()
         LAYOUT=$1
         echo "Using the given layout ($1) for AppleHDA.\n"
     else
-        LAYOUT=892
-        echo "Using the default layout (892) for AppleHDA.\n"
+        # Grab 'layout-id' property from ioreg (stripped with sed / RegEX magic).
+        local grepStr=`ioreg -p IODeviceTree -n HDEF@1B | grep layout-id | sed -e 's/.*[<]//' -e 's/0\{4\}>$//'`
+
+        # Swap bytes with help of ${str:pos:num}
+        local layoutID=`echo ${grepStr:2:2}${grepStr:0:2}`
+
+        # Convert value from hexadecimal to decimal.
+        LAYOUT="$((0x$layoutID))"
+
+        echo "Using the builtin layout ($LAYOUT) for AppleHDA.\n"
   fi
 }
 
@@ -156,6 +170,56 @@ function _checkDirectories()
 }
 
 #--------------------------------------------------------------------------------
+
+function _createLaunchDaemonPlist()
+{
+  echo '\nCreating com.fileguard.watcher.plist'
+  echo "------------------------------------------------------------"
+  echo '<?xml version="1.0" encoding="UTF-8"?>'                  > /tmp/com.fileguard.watcher.plist
+  echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> /tmp/com.fileguard.watcher.pli$
+  echo '<plist version="1.0">'                                  >> /tmp/com.fileguard.watcher.plist
+  echo '<dict>'                                                 >> /tmp/com.fileguard.watcher.plist
+  echo '    <key>Label</key>'                                   >> /tmp/com.fileguard.watcher.plist
+  echo '    <string>com.fileguard.watcher</string>'             >> /tmp/com.fileguard.watcher.plist
+  echo '    <key>ProgramArguments</key>'                        >> /tmp/com.fileguard.watcher.plist
+  echo '    <array>'                                            >> /tmp/com.fileguard.watcher.plist
+  echo '        <string>/Extra/FileGuard/Daemon/daemon</string>'>> /tmp/com.fileguard.watcher.plist
+  echo '    </array>'                                           >> /tmp/com.fileguard.watcher.plist
+  echo '    <key>RunAtLoad</key>'                               >> /tmp/com.fileguard.watcher.plist
+  echo '    <false/>'                                           >> /tmp/com.fileguard.watcher.plist
+  echo '    <key>WatchPaths</key>'                              >> /tmp/com.fileguard.watcher.plist
+  echo '    <array>'                                            >> /tmp/com.fileguard.watcher.plist
+
+  #------------------------------------------------------------------------------
+
+  for target in "${fgWatchTargets[@]}"
+  do
+      # Checking for full path (not using: /S*/L*/Extensions).
+      if [[ $target =~ ^/ ]];
+          then
+              watchPath=$target
+          else
+              watchPath=${EXTENSIONS_DIR}$target
+          fi
+
+          echo '        <string>'$watchPath'</string>'          >> /tmp/com.fileguard.watcher.plist
+  done
+
+  #------------------------------------------------------------------------------
+
+  echo '    </array>\n</dict>\n</plist>'                        >> /tmp/com.fileguard.watcher.plist
+
+  # Shows a list with the new (to be activated) target paths.
+  `echo defaults read /tmp/com.fileguard.watcher.plist WatchPaths`
+
+  echo "------------------------------------------------------------"
+
+  # Copy the newly created plist and kickstart the FileGuard daemon.
+  `/usr/bin/sudo /bin/cp -p /tmp/com.fileguard.watcher.plist /Library/LaunchDaemons/`
+  `/usr/bin/sudo /bin/launchctl load /Library/LaunchDaemons/com.fileguard.watcher.plist`
+}
+
+#--------------------------------------------------------------------------------
 #
 # Only administrators (root) can run this script - hence the check for it here.
 #
@@ -176,6 +240,7 @@ function _isRoot()
 function _main()
 {
   _setLayoutID $1
+  _initWatchTargets
   _checkDirectories
 
   echo "\nFileGuard makeFG.sh - check started on" `date "+%d-%m-%Y @ %H:%M:%S"`
@@ -189,6 +254,12 @@ function _main()
     done
 
   echo "------------------------------------------------------------"
+
+  # Check the FileGuard launch daemon plist (create it when missing).
+  if [ $(_fileExists "/Library/LaunchDaemons/com.fileguard.watcher.plist") -eq 0 ]; then
+    _createLaunchDaemonPlist
+  fi
+
   echo "Done\n"
 
   cd /Extra
