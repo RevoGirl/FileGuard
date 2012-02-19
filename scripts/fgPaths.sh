@@ -36,7 +36,7 @@ function _setFilePermissions()
 
 function _doCmdAdd()
 {
-  _doCmdInit quite # Silently creates the missing plist.
+  _doCmdInit quiet # Silently creates the missing plist.
 
   `defaults write ${fgWatcherPlist} WatchPaths -array-add ${1}`
 
