@@ -96,14 +96,6 @@ function _doCmdInit()
       echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $fgWatcherPlist
       echo '<plist version="1.0">'					>> $fgWatcherPlist
       echo '<dict>'							>> $fgWatcherPlist
-      echo '    <key>Label</key>'					>> $fgWatcherPlist
-      echo '    <string>com.fileguard.watcher</string>'			>> $fgWatcherPlist
-      echo '    <key>ProgramArguments</key>'				>> $fgWatcherPlist
-      echo '    <array>'						>> $fgWatcherPlist
-      echo '        <string>/Extra/FileGuard/Daemon/daemon</string>'	>> $fgWatcherPlist
-      echo '    </array>'						>> $fgWatcherPlist
-      echo '    <key>RunAtLoad</key>'					>> $fgWatcherPlist
-      echo '    <false/>'						>> $fgWatcherPlist
       echo '    <key>WatchPaths</key>'					>> $fgWatcherPlist
       echo '    <array>'						>> $fgWatcherPlist
       echo '    </array>'						>> $fgWatcherPlist
