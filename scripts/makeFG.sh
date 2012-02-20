@@ -4,12 +4,12 @@
 # Script (makeFG.sh) to create the FileGuard directory structure, 
 # and to backup certain essential files required by OS X.
 #
-# Version 0.8 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.9 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 # Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
 
-#set -x # Used for tracing errors
+#set -x # Used for tracing errors (can be put anywhere in the script).
 
 #================================= GLOBAL VARS ==================================
 
@@ -69,18 +69,24 @@ function _fileExists()
 
 function _addFileToStorage()
 {
+  #
   # Strip filename from path.
+  #
   local TARGET_PATH=${2%/*}
 
   # Check target path (directory).
   if [ ! -d $TARGET_PATH ]; then
+      #
       # Target path not found (add directory).
+      #
       `/usr/bin/sudo /bin/mkdir -p $TARGET_PATH`
   fi
 
   if [ -s $1 ];
       then
+          #
           # Copy file from the OS X location to /Extra/FileGuard/Files/..
+          #
           `/usr/bin/sudo /bin/cp -Rp $1 $2`
 
           echo "File added to FileGuard: $2"
@@ -95,7 +101,9 @@ function _checkWatchTarget()
 {
   local PATH=$1
 
+  #
   # A path starting with a forward slash must be followed (full path given).
+  #
   if [[ $PATH =~ ^/ ]];
       then # Full path given (follow it).
           local SOURCE_FILE=$PATH
@@ -131,13 +139,19 @@ function _setLayoutID()
         LAYOUT=$1
         echo "Using the given layout ($1) for AppleHDA.\n"
     else
+        #
         # Grab 'layout-id' property from ioreg (stripped with sed / RegEX magic).
+        #
         local grepStr=`ioreg -p IODeviceTree -n HDEF@1B | grep layout-id | sed -e 's/.*[<]//' -e 's/0\{4\}>$//'`
 
+        #
         # Swap bytes with help of ${str:pos:num}
+        #
         local layoutID=`echo ${grepStr:2:2}${grepStr:0:2}`
 
+        #
         # Convert value from hexadecimal to decimal.
+        #
         LAYOUT="$((0x$layoutID))"
 
         echo "Using the builtin layout ($LAYOUT) for AppleHDA.\n"
@@ -156,7 +170,9 @@ function _checkDirectories()
   do
     echo "Checking directory: $dir"
 
+    #
     # Check target directory.
+    #
     if [ ! -d "$dir" ]; then
       sudo mkdir $dir
     fi
@@ -194,7 +210,9 @@ function _createLaunchDaemonPlist()
 
   for target in "${fgWatchTargets[@]}"
   do
+      #
       # Checking for full path (not using: /S*/L*/Extensions).
+      #
       if [[ $target =~ ^/ ]];
           then
               watchPath=$target
@@ -202,19 +220,29 @@ function _createLaunchDaemonPlist()
               watchPath=${EXTENSIONS_DIR}$target
           fi
 
-          echo '        <string>'$watchPath'</string>'          >> /tmp/com.fileguard.watcher.plist
+          echo '        <string>'$watchPath'</string>'		>> /tmp/com.fileguard.watcher.plist
   done
 
   #------------------------------------------------------------------------------
 
-  echo '    </array>\n</dict>\n</plist>'                        >> /tmp/com.fileguard.watcher.plist
+  echo '    </array>'						>> /tmp/com.fileguard.watcher.plist
+  echo '    <key>StandardErrorPath</key>'                       >> /tmp/com.fileguard.watcher.plist
+  echo '    <string>/var/log/FileGuardDaemon.log</string>'      >> /tmp/com.fileguard.watcher.plist
+  echo '    <key>StandardOutPath</key>'                         >> /tmp/com.fileguard.watcher.plist
+  echo '    <string>/var/log/FileGuardDaemon.log</string>'      >> /tmp/com.fileguard.watcher.plist
+  echo '</dict>							>> /tmp/com.fileguard.watcher.plist
+  echo '</plist>'						>> /tmp/com.fileguard.watcher.plist
 
+  #
   # Shows a list with the new (to be activated) target paths.
+  #
   `echo defaults read /tmp/com.fileguard.watcher.plist WatchPaths`
 
   echo "------------------------------------------------------------"
 
+  #
   # Copy the newly created plist and kickstart the FileGuard daemon.
+  #
   `/usr/bin/sudo /bin/cp -p /tmp/com.fileguard.watcher.plist /Library/LaunchDaemons/`
   `/usr/bin/sudo /bin/launchctl load /Library/LaunchDaemons/com.fileguard.watcher.plist`
 }
@@ -227,7 +255,7 @@ function _createLaunchDaemonPlist()
 
 function _isRoot()
 {
-  if [ "$(id -u)" != "0" ]; then
+  if [ $(id -u) -ne 0 ]; then
       echo "This script must be run as root" 1>&2
       exit 1
   fi
@@ -255,7 +283,9 @@ function _main()
 
   echo "------------------------------------------------------------"
 
+  #
   # Check the FileGuard launch daemon plist (create it when missing).
+  #
   if [ $(_fileExists "/Library/LaunchDaemons/com.fileguard.watcher.plist") -eq 0 ]; then
     _createLaunchDaemonPlist
   fi
