@@ -3,16 +3,79 @@
 #
 # Administrator shell script (fgPaths.sh) to control the FileGuard WatchPaths
 #
-# Version 0.3 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.6 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+#
+# Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
 
 #set -x # Used for tracing errors
 
 #================================= GLOBAL VARS ==================================
 
-fgWatcherPlist=/Extra/FileGuard/com.fileguard.config.plist
+fgConfigPlist=/Extra/FileGuard/com.fileguard.config.plist
 
 #=============================== LOCAL FUNCTIONS ================================
+
+function _setLayoutID()
+{
+  if [ $# == 1 ];
+      then
+          LAYOUT=$1
+          echo "Using the given layout ($1) for AppleHDA."
+      else
+          #
+          # Grab 'layout-id' property from ioreg (stripped with sed / RegEX magic).
+          #
+          local grepStr=`ioreg -p IODeviceTree -n HDEF@1B | grep layout-id | sed -e 's/.*[<]//' -e 's/0\{4\}>$//'`
+          #
+          # Swap bytes with help of ${str:pos:num}
+          #
+          local layoutID=`echo ${grepStr:2:2}${grepStr:0:2}`
+          #
+          # Convert value from hexadecimal to decimal.
+          #
+          LAYOUT="$((0x$layoutID))"
+
+          echo "Using the builtin layout ($LAYOUT) for AppleHDA."
+  fi
+}
+
+#--------------------------------------------------------------------------------
+
+function _initWatchTargets()
+{
+  #
+  # Note: Kexts don't need a full path (see examples below).
+  #
+  fgDefaultWatchList[0]=/boot
+  fgDefaultWatchList[1]=/usr/standalone/i386/boot
+
+  fgDefaultWatchList[2]=AppleHDA.kext/Contents/MacOS/AppleHDA
+  fgDefaultWatchList[3]=AppleHDA.kext/Contents/Resources/layout${LAYOUT}.xml
+
+  fgDefaultWatchList[4]=AppleHDA.kext/Contents/Resources/Platforms.xml
+  fgDefaultWatchList[5]=AppleHDA.kext/Contents/PlugIns/AppleHDAHardwareConfigDriver.kext/Contents/Info.plist
+
+  # Backup complete kext.
+  fgDefaultWatchList[6]=FakeSMC.kext
+
+  # Only backup the specified file.
+  fgDefaultWatchList[7]=AppleIntelCPUPowerManagement.kext/Contents/MacOS/AppleIntelCPUPowerManagement
+
+  fgDefaultWatchList[8]=AppleIntelSNBGraphicsFB.kext/Contents/MacOS/AppleIntelSNBGraphicsFB
+  fgDefaultWatchList[9]=ATI6000Controller.kext/Contents/MacOS/ATI6000Controller
+
+  # Backup the complete kext in the Plugins directory.
+  fgDefaultWatchList[10]=IONetworkingFamily.kext/Contents/PlugIns/AppleIntelE1000e.kext
+  fgDefaultWatchList[11]=IONetworkingFamily.kext/Contents/PlugIns/AppleYukon2.kext
+
+  #
+  # Only added here to test my duplicates check logic.
+  #
+  # fgDefaultWatchList[12]=FakeSMC.kext
+}
+
+#--------------------------------------------------------------------------------
 
 function _fileExists()
 {
@@ -28,44 +91,73 @@ function _fileExists()
 
 function _setFilePermissions()
 {
-  `/usr/bin/sudo /bin/chmod 644 ${fgWatcherPlist}`
-  `/usr/bin/sudo /usr/sbin/chown root:wheel ${fgWatcherPlist}`
+  `/usr/bin/sudo /bin/chmod 644 ${fgConfigPlist}`
+  `/usr/bin/sudo /usr/sbin/chown root:wheel ${fgConfigPlist}`
 }
 
 #--------------------------------------------------------------------------------
 
 function _doCmdAdd()
 {
+  local found=0
+
   _doCmdInit quiet # Silently creates the missing plist.
 
-  `defaults write ${fgWatcherPlist} WatchPaths -array-add ${1}`
+  local currentWatchPaths=(`defaults read ${fgConfigPlist} WatchPaths | tr '\n' ' ' | sed 's/(//;s/ *//g;s/\"//g;s/,/ /g;s/)//'`)
 
-  _setFilePermissions
+  if [ ${#currentWatchPaths[@]} -gt 0 ]; then
+      #
+      # Check current items, to prevent duplicates.
+      #
+      for element in $(seq 0 $((${#currentWatchPaths[@]} - 1)))
+      do
+          if [ "${currentWatchPaths[$element]}" == "$1" ]; then
+              echo "Error: Watch path already listed: ${1}"
+              local found=1
+              break
+          fi
+      done
+  fi
 
-  _doCmdConvert
+  if [ $found -eq 0 ]; then
+      `defaults write ${fgConfigPlist} WatchPaths -array-add ${1%quick}`
+      #
+      # Skipped when called from _doCmdSetup (speedup the process).
+      #
+      if [ ! $2 ]; then
+          _setFilePermissions
+          _doCmdConvert quiet
+      fi
+  fi
 }
 
 #--------------------------------------------------------------------------------
 
 function _doCmdConvert()
 {
-  if [ $(_fileExists $fgWatcherPlist) -eq 1 ];
+  if [ $(_fileExists $fgConfigPlist) -eq 1 ];
       then
           #
           # Is this a binary plist?
           #
-          local ret="`/usr/bin/sudo /usr/bin/grep -e bplist00 ${fgWatcherPlist}`"
+          local ret="`/usr/bin/sudo /usr/bin/grep -e bplist00 ${fgConfigPlist}`"
 
           if [[ $ret =~ ^Binary ]];
               then
-                  echo "Config file converted to XML plist format"
-                  `/usr/bin/sudo /usr/bin/plutil -convert xml1 ${fgWatcherPlist}`
+                  if [ ! $1 ]; then
+                      echo "Config file converted to XML plist format"
+                  fi
+                  
+                  `/usr/bin/sudo /usr/bin/plutil -convert xml1 ${fgConfigPlist}`
               else
-                  echo "Config file converted to binary plist format"
-                  `/usr/bin/sudo /usr/bin/plutil -convert binary1 ${fgWatcherPlist}`
+                  if [ ! $1 ]; then
+                      echo "Config file converted to binary plist format"
+                  fi
+
+                  `/usr/bin/sudo /usr/bin/plutil -convert binary1 ${fgConfigPlist}`
           fi
       else
-          echo "Error: ${fgWatcherPlist} not found!"
+          echo "Error: ${fgConfigPlist} not found!"
           echo 'Use: "./fgPaths.sh init" to create it'
   fi
 }
@@ -74,54 +166,112 @@ function _doCmdConvert()
 
 function _doCmdDelete()
 {
-  echo "Sorry. This command is not yet implemented"
+  local found=0
+  local currentWatchPaths=(`defaults read ${fgConfigPlist} WatchPaths | tr '\n' ' ' | sed 's/(//;s/ *//g;s/\"//g;s/,/ /g;s/)//'`)
 
-  #
-  # RFE: Implement me.
-  #
+  if [ ${#currentWatchPaths[@]} -gt 0 ];
+      then
+          local newWatchPaths=(${currentWatchPaths[@]})
+
+          for element in $(seq 0 $((${#currentWatchPaths[@]} - 1)))
+          do
+              if [ "${currentWatchPaths[$element]}" == "$1" ];
+                  then
+                      unset newWatchPaths[$element]
+                      echo "Notice: Watch path[${element}] now removed: ${1}"
+                      local found=1
+              fi
+          done
+
+          if [ $found -eq 1 ];
+              then
+                  `/usr/bin/sudo /usr/bin/defaults delete $fgConfigPlist WatchPaths`
+                  local new="${newWatchPaths[@]}"  # Bah!
+                  _doCmdAdd "$new"
+                  _doCmdShow
+              else
+                  echo "Error: Can't delete given (unknown) watch path: ${1}"
+          fi
+      else
+          echo "Error: Watch path list is empty (nothing to delete)!"
+  fi
 }
 
 #--------------------------------------------------------------------------------
 
 function _doCmdInit()
 {
-  if [ $(_fileExists $fgWatcherPlist) -eq 0 ];
+  if [ $(_fileExists $fgConfigPlist) -eq 0 ];
     then
       if [ ! $1 ]; then
-        echo "Creating: ${fgWatcherPlist} (empty / no watch paths yet)"
+        echo "Creating: ${fgConfigPlist} (empty / no watch paths yet)"
         echo 'Use: "./fgPaths.sh add <path>" to add a watch path'
       fi
 
-      echo '<?xml version="1.0" encoding="UTF-8"?>'			 > $fgWatcherPlist
-      echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $fgWatcherPlist
-      echo '<plist version="1.0">'					>> $fgWatcherPlist
-      echo '<dict>'							>> $fgWatcherPlist
-      echo '    <key>WatchPaths</key>'					>> $fgWatcherPlist
-      echo '    <array>'						>> $fgWatcherPlist
-      echo '    </array>'						>> $fgWatcherPlist
-      echo '</dict>'							>> $fgWatcherPlist
-      echo '</plist>'							>> $fgWatcherPlist
+      echo '<?xml version="1.0" encoding="UTF-8"?>'			 > $fgConfigPlist
+      echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $fgConfigPlist
+      echo '<plist version="1.0">'					>> $fgConfigPlist
+      echo '<dict>'							>> $fgConfigPlist
+      echo '    <key>WatchPaths</key>'					>> $fgConfigPlist
+      echo '    <array>'						>> $fgConfigPlist
+      echo '    </array>'						>> $fgConfigPlist
+      echo '</dict>'							>> $fgConfigPlist
+      echo '</plist>'							>> $fgConfigPlist
       _setFilePermissions
     else
       if [ ! $1 ]; then
-        echo "Command ignored (${fgWatcherPlist} is already there)"
+        echo "Command ignored (${fgConfigPlist} is already there)"
       fi
   fi
 }
 
 #--------------------------------------------------------------------------------
 
+function _doCmdSetup()
+{
+  #
+  # Check if config file exists, if yes then wipe it, else create the file. 
+  #
+  if [ $(_fileExists $fgConfigPlist) -eq 1 ];
+      then
+          `/usr/bin/sudo /usr/bin/defaults delete $fgConfigPlist WatchPaths`
+  fi
+
+  _doCmdInit quiet
+  _setLayoutID $1
+  _initWatchTargets
+
+  #
+  # Now we should have our config file so let's inject the default watch list.
+  #
+  for element in $(seq 0 $((${#fgDefaultWatchList[@]} -1)))
+  do
+      # `defaults write ${fgConfigPlist} WatchPaths -array-add ${fgDefaultWatchList[$element]}`
+      _doCmdAdd ${fgDefaultWatchList[$element]} quick
+  done
+
+  _setFilePermissions
+  _doCmdConvert quiet
+  _doCmdShow
+}
+
+#--------------------------------------------------------------------------------
+
 function _doCmdShow()
 {
-  local rawdata=(`defaults read ${fgWatcherPlist} WatchPaths | tr '\n' ' ' | sed 's/(//;s/ *//g;s/\"//g;s/,/ /g;s/)//'`)
-
-  for value in "${rawdata[@]}"
-  do
-    echo "WatchPath:" $value
-    #
-    # RFE: Show the index between brackets here.
-    #
-  done
+  local watchPaths=(`defaults read ${fgConfigPlist} WatchPaths | tr '\n' ' ' | sed 's/(//;s/ *//g;s/\"//g;s/,/ /g;s/)//'`)
+  #
+  # Catching the 'bad array subscript' error (when the array is empty).
+  #
+  if [ ${#watchPaths[@]} -gt 0 ];
+      then
+          for element in $(seq 0 $((${#watchPaths[@]} - 1)))
+          do
+              echo "WatchPaths[$element]:" ${watchPaths[$element]}
+          done
+      else
+          echo "Error: Watch list is (still) empty"
+  fi
 }
 
 #--------------------------------------------------------------------------------
@@ -133,13 +283,14 @@ function _main()
   case $cmdAction in
         add)
             _doCmdAdd $2
+            _doCmdShow
             ;;
 
         convert)
             _doCmdConvert
             ;;
 
-        delete) # Not yet implemented!
+        delete)
             _doCmdDelete $2 
             ;;
 
@@ -151,20 +302,21 @@ function _main()
             _doCmdShow
             ;;
 
+        setup)
+            _doCmdSetup $2
+            ;;
+
         show)
             _doCmdShow
             ;;
 
         wipe)
-            `defaults delete $fgWatcherPlist WatchPaths`
+            `/usr/bin/sudo /usr/bin/defaults delete $fgConfigPlist WatchPaths`
             ;;
 
         *)
 
-        echo $"Usage: $0 {add <watch path> | convert | delete <watch path> | init | list | show | wipe}"
-        #
-        # RFE: Add 'setup' (call init and then add a list with default watch paths). 
-        #
+        echo $"Usage: $0 {add <watch path>|convert|delete <watch path>|init|list|setup <layout-id>|show|wipe}"
         exit 1
   esac
 }
