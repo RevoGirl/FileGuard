@@ -3,7 +3,7 @@
 # Script (daemon) to restore files from the FileGuard storage, after they
 # have been removed and/or replaced by the OS X installer.
 #
-# Version 0.6 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.7 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 
 #
@@ -12,24 +12,26 @@
 # won't be surprised when you get pissed off by him (just trust me on this one).
 #
 
-#set -x # Used for tracing errors
-
+#set -x # Used for tracing errors (can be put anywhere in the script).
 
 #============================== CONFIGURATION VAR ===============================
 
-LAYOUT=892 # We need to read this from a (configuration) file!
+MAXLOGSIZE=100000 # RFE (low prio): Add setting to 'com.fileguard.config.plist'
 
 AUTOMATIC_SYNC=1 # New experimental feature (copies missing files to FileGuard).
 
 #================================= GLOBAL VARS ==================================
 
-FILEGUARD_FILES="/Extra/FileGuard/Files" # Do <em>not</em> add a forward slash!
-FILEGUARD_EXTENSIONS="/Extra/FileGuard/Files/System/Library/Extensions/"
-EXTENSIONS_DIR="/System/Library/Extensions/"
+fgConfigPlist=/Extra/FileGuard/com.fileguard.config.plist
+
+EXTENSIONS_DIR=/System/Library/Extensions/
+
+FILEGUARD_FILES=/Extra/FileGuard/Files  # Do <em>not</em> add a forward slash!
+FILEGUARD_EXTENSIONS=${FILEGUARD_FILES}$EXTENSIONS_DIR
 
 #=============================== LOCAL FUNCTIONS ================================
 
-function getChecksum()
+function _getChecksum()
 {
    local result=`/sbin/md5 -q $1`
    echo "$result"
@@ -37,11 +39,12 @@ function getChecksum()
 
 #--------------------------------------------------------------------------------
 
-function doDirectoryDiff()
+function _doDirectoryDiff()
 {
   local result=`/usr/bin/diff -rq $1 $2 > /tmp/fgscratch`
-  
+  #
   # Check filesize (-s) of our scratch file.
+  #
   if [ -s "/tmp/fgscratch" ];
       then
           echo 1 # Directory content is different.
@@ -52,18 +55,18 @@ function doDirectoryDiff()
 
 #--------------------------------------------------------------------------------
 
-function shouldRestore()
+function _shouldRestore()
 {
   # Plain ordinary files can be checked with md5 (unlike directories).
   if [ -f $1 ]; then
-      if [ $(getChecksum $1) == $(getChecksum $2) ];
+      if [ $(_getChecksum $1) == $(_getChecksum $2) ];
           then
               echo 0 # "Same checksum, no restore required."
           else
               echo 1 # "Different checksum, restore required."
       fi
   elif [ -d $1 ]; then
-      if [ $(doDirectoryDiff $1 $2) -eq 1 ]; 
+      if [ $(_doDirectoryDiff $1 $2) -eq 1 ]; 
           then
               echo 1 # Directory content is different.
           else
@@ -74,27 +77,32 @@ function shouldRestore()
 
 #--------------------------------------------------------------------------------
 
-function restoreFromFileGuard()
+function _restoreFromFileGuard()
 {
   # Neat little trick to remove /*.kext from the trailing end of the target path
   local path=${2%/*.kext}
 
-  # Sigh. Can't even remember if we need this or not.
-  #if [ $(fileExists $path) -eq 0 ]; then
-      #path=${2%/*}
-  #fi
+  #
+  # First we check if the target file exist.
+  #
+  if [ $(_fileExists $path) -eq 1 ]; then
+      #
+      # If it does, then make a backup copy of the file.
+      #
+      `/usr/bin/sudo /bin/cp -Rp $2 $2.new`
+  fi
 
   #
-  # Commented out to protect people from running into problems
+  # Restore file from FileGuard storage.
   #
-  #/bin/cp -Rp $1 $path
+  `/usr/bin/sudo /bin/cp -Rp $1 $path`
 
   echo "File restored from FileGuard: $2"
 }
 
 #-------------------------------------------------------------------------------
 
-function fileExists()
+function _fileExists()
 {
   if [ -e $1 ]; # file (-f) or directory (-d) 
       then
@@ -106,7 +114,7 @@ function fileExists()
 
 #-------------------------------------------------------------------------------
 
-function addFileToStorage()
+function _addFileToStorage()
 {
   # Strip filename from path.
   local TARGET_PATH=${1%/*}
@@ -130,7 +138,7 @@ function addFileToStorage()
 
 #-------------------------------------------------------------------------------
 
-function checkFile()
+function _checkFile()
 {
   local PATH=$1
 
@@ -144,52 +152,76 @@ function checkFile()
           local TARGET_FILE=${EXTENSIONS_DIR}$PATH
   fi
 
-  if [ $(fileExists $SOURCE_FILE) -eq 1 ]; 
+  if [ $(_fileExists $SOURCE_FILE) -eq 1 ]; 
       then
-          if [ $(fileExists $TARGET_FILE) -eq 1 ]; 
+          if [ $(_fileExists $TARGET_FILE) -eq 1 ]; 
               then
-                  if [ $(shouldRestore $SOURCE_FILE $TARGET_FILE) -eq 1 ]; 
+                  if [ $(_shouldRestore $SOURCE_FILE $TARGET_FILE) -eq 1 ]; 
                       then
-                          echo $(restoreFromFileGuard $SOURCE_FILE $TARGET_FILE)
+                          echo $(_restoreFromFileGuard $SOURCE_FILE $TARGET_FILE)
                       else
                           echo "File checked: $TARGET_FILE"
                   fi
               else
-                  echo $(restoreFromFileGuard $SOURCE_FILE $TARGET_FILE)
+                  echo $(_restoreFromFileGuard $SOURCE_FILE $TARGET_FILE)
           fi
       else
           echo "ERROR: File unavailable from FileGuard: $SOURCE_FILE"
 
           if [ $AUTOMATIC_SYNC -eq 1 ]; then
-              echo $(addFileToStorage $SOURCE_FILE $TARGET_FILE)
+              echo $(_addFileToStorage $SOURCE_FILE $TARGET_FILE)
           fi
   fi
 }
 
-#================================================================================
+#--------------------------------------------------------------------------------
 
-echo "\nFileGuard daemon - file check started on" `date "+%d-%m-%Y @ %H:%M:%S"`
-echo "--------------------------------------------------------------"
+function _logfileTurnover
+{
+  local size=`/usr/bin/stat -f "%z" /var/log/FileGuardDaemon.log` 
 
-echo $(checkFile "/boot")
-echo $(checkFile "/usr/standalone/i386/boot")
+  if [ $size -gt $MAXLOGSIZE ]; then
+      local index=0 # index should increase (RFE: fix me).
+      `/usr/bin/sudo /bin/mv -p /var/log/FileGuardDaemon.log /var/log/FileGuardDaemon.log.$index`
+  fi
+}
 
-echo $(checkFile "AppleHDA.kext/Contents/MacOS/AppleHDA")
-echo $(checkFile "AppleHDA.kext/Contents/Resources/layout${LAYOUT}.xml")
-echo $(checkFile "AppleHDA.kext/Contents/Resources/Platforms.xml")
-echo $(checkFile "AppleHDA.kext/Contents/PlugIns/AppleHDAHardwareConfigDriver.kext/Contents/Info.plist")
-echo $(checkFile "AppleIntelCPUPowerManagement.kext/Contents/MacOS/AppleIntelCPUPowerManagement")
+#--------------------------------------------------------------------------------
 
-echo $(checkFile "ATI6000Controller.kext/Contents/MacOS/ATIController")
+function _main()
+{
+  #
+  # Check the filesize of our logfile.
+  #
+  _logfileTurnover
 
-echo $(checkFile "IONetworkingFamily.kext/Contents/PlugIns/AppleIntelE1000e.kext")
-echo $(checkFile "IONetworkingFamily.kext/Contents/PlugIns/AppleYukon2.kext")
+  echo "\nFileGuard daemon - file check started on" `date "+%d-%m-%Y @ %H:%M:%S"`
+  echo "--------------------------------------------------------------"
 
-echo $(checkFile "FakeSMC.kext")
+  local watchPaths=(`defaults read ${fgConfigPlist} WatchPaths | tr '\n' ' ' | sed 's/(//;s/ *//g;s/\"//g;s/,/ /g;s/)//'`)
 
-echo "--------------------------------------------------------------"
-echo "FileGuard daemon - file check finished\n"
+  #
+  # Catching the 'bad array subscript' error (when the array is empty).
+  #
+  if [ ${#watchPaths[@]} -gt 0 ];
+      then
+          for element in $(seq 0 $((${#watchPaths[@]} - 1)))
+          do
+              echo $(_checkFile ${watchPaths[$element]})
+          done
+      else
+          echo "Error: Watch list is (still) empty"
+  fi
 
-#================================================================================
+  echo "--------------------------------------------------------------"
+  echo "FileGuard daemon - file check finished\n"
+}
+
+#==================================== START =====================================
+
+_main
 
 exit 0
+
+#--------------------------------------------------------------------------------
+
