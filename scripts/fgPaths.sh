@@ -3,7 +3,7 @@
 #
 # Administrator shell script (fgPaths.sh) to control the FileGuard WatchPaths
 #
-# Version 0.7 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.8 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 # Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
@@ -12,9 +12,11 @@
 
 #================================= GLOBAL VARS ==================================
 
+fileGuardBaseDir=/Extra # Can be changed for testing, synced with fgSetup.sh!
+
 DAEMON_LABEL=com.fileguard.watcher
 
-fgConfigPlist=/Extra/FileGuard/com.fileguard.config.plist
+fgConfigPlist=$fileGuardBaseDir/FileGuard/com.fileguard.config.plist
 
 fgTmpLaunchDaemonPlist=/tmp/com.fileguard.watcher.plist
 
@@ -27,7 +29,8 @@ function _setLayoutID()
   if [ $# == 1 ];
       then
           LAYOUT=$1
-          echo "Using the given layout ($1) for AppleHDA."
+          echo "Using the given layout-id ($1) for AppleHDA."
+          echo "---------------------------------------------------------------------------"
       else
           #
           # Grab 'layout-id' property from ioreg (stripped with sed / RegEX magic).
@@ -42,7 +45,8 @@ function _setLayoutID()
           #
           LAYOUT="$((0x$layoutID))"
 
-          echo "Using the builtin layout ($LAYOUT) for AppleHDA."
+          echo "Using the builtin layout-id ($LAYOUT) for AppleHDA."
+          _showLine
   fi
 }
 
@@ -85,8 +89,8 @@ function _initWatchTargets()
 
 function _initLaunchDaemonPlist()
 {
-  echo "Creating: $fgTmpLaunchDaemonPlist"
-  echo "------------------------------------------------------------"
+  echo "Launch Daemon: File created at: $fgTmpLaunchDaemonPlist"
+  _showLine
   echo '<?xml version="1.0" encoding="UTF-8"?>'                  > $fgTmpLaunchDaemonPlist
   echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $fgTmpLaunchDaemonPlist
   echo '<plist version="1.0">'                                  >> $fgTmpLaunchDaemonPlist
@@ -95,7 +99,7 @@ function _initLaunchDaemonPlist()
   echo '    <string>com.fileguard.watcher</string>'             >> $fgTmpLaunchDaemonPlist
   echo '    <key>ProgramArguments</key>'                        >> $fgTmpLaunchDaemonPlist
   echo '    <array>'                                            >> $fgTmpLaunchDaemonPlist
-  echo '        <string>/Extra/FileGuard/Daemon/daemon</string>'>> $fgTmpLaunchDaemonPlist
+  echo '        <string>${fileGuardBaseDir}/FileGuard/Daemon/daemon</string>'>> $fgTmpLaunchDaemonPlist
   echo '    </array>'                                           >> $fgTmpLaunchDaemonPlist
   echo '    <key>RunAtLoad</key>'                               >> $fgTmpLaunchDaemonPlist
   echo '    <false/>'                                           >> $fgTmpLaunchDaemonPlist
@@ -108,6 +112,13 @@ function _initLaunchDaemonPlist()
   echo '    <string>/var/log/FileGuardDaemon.log</string>'      >> $fgTmpLaunchDaemonPlist
   echo '</dict>'                                                >> $fgTmpLaunchDaemonPlist
   echo '</plist>'                                               >> $fgTmpLaunchDaemonPlist
+}
+
+#--------------------------------------------------------------------------------
+
+function _showLine()
+{
+  echo "---------------------------------------------------------------------------"
 }
 
 #--------------------------------------------------------------------------------
@@ -355,29 +366,35 @@ function _doCmdSync()
           done
   fi
   #
-  # Convert the file to human 'readable' XML format.
+  # Convert the file to a human 'readable' XML format.
   #
+  echo "Launch Daemon: File converted to human 'readable' XML format."
   `/usr/bin/sudo /usr/bin/plutil -convert xml1 ${fgTmpLaunchDaemonPlist}`
   #
   # Fix file ownership and permissions.
   #
+  echo "Launch Daemon: File ownership and permissions fixed."
   `/usr/bin/sudo /bin/chmod 644 ${fgTmpLaunchDaemonPlist}`
   `/usr/bin/sudo /usr/sbin/chown root:wheel ${fgTmpLaunchDaemonPlist}`
   #
   # Move synced file to the right spot.
   #
+  echo "Launch Daemon: Moved to: $fgLaunchDaemonPlist"
   `/usr/bin/sudo /bin/cp -p $fgTmpLaunchDaemonPlist $fgLaunchDaemonPlist`
   #
   # Stopping the launch daemon.
   #
+  echo "Launch Daemon: Stopping..."
   `/usr/bin/sudo /bin/launchctl stop ${DAEMON_LABEL}`
   #
   # Unloading the launch daemon.
   #
+  echo "Launch Daemon: Unloading..."
   `/usr/bin/sudo /bin/launchctl unload /Library/LaunchDaemons/${DAEMON_LABEL}.plist`
   #
   # Reloading the launch daemon.
   #
+  echo "Launch Deamon: Reloading..."
   `/usr/bin/sudo /bin/launchctl load /Library/LaunchDaemons/${DAEMON_LABEL}.plist`
 }
 
