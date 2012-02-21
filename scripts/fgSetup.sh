@@ -219,9 +219,9 @@ function _main()
   # Check the FileGuard launch daemon plist (create and sync it when missing).
   #
   if [ $(_fileExists fgLaunchDaemonPlist) -eq 0 ]; then
-      /usr/bin/sudo /Extra/FileGuard/Scripts/fgPaths-bck.sh setup
+      /usr/bin/sudo /Extra/FileGuard/Scripts/fgPaths.sh setup
       _showLine
-      /usr/bin/sudo /Extra/FileGuard/Scripts/fgPaths-bck.sh sync
+      /usr/bin/sudo /Extra/FileGuard/Scripts/fgPaths.sh sync
   fi
 
   _showLine

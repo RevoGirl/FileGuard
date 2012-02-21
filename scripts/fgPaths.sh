@@ -16,11 +16,21 @@ fileGuardBaseDir=/Extra # Can be changed for testing, synced with fgSetup.sh!
 
 DAEMON_LABEL=com.fileguard.watcher
 
-fgConfigPlist=$fileGuardBaseDir/FileGuard/com.fileguard.config.plist
+fgConfigPlist=${fileGuardBaseDir}/FileGuard/com.fileguard.config.plist
 
 fgTmpLaunchDaemonPlist=/tmp/com.fileguard.watcher.plist
 
 fgLaunchDaemonPlist=/Library/LaunchDaemons/com.fileguard.watcher.plist
+
+#
+# Next lines are for a new feature (in development / still untested).
+#
+
+PURGE_UNSET_WATCHPATHS=0
+
+fgStoragePath=${fileGuardBaseDir}/FileGuard/Files/
+
+fgStorageExtensionsPath=${fgStoragePath}Extensions/
 
 #=============================== LOCAL FUNCTIONS ================================
 
@@ -99,7 +109,7 @@ function _initLaunchDaemonPlist()
   echo '    <string>com.fileguard.watcher</string>'             >> $fgTmpLaunchDaemonPlist
   echo '    <key>ProgramArguments</key>'                        >> $fgTmpLaunchDaemonPlist
   echo '    <array>'                                            >> $fgTmpLaunchDaemonPlist
-  echo '        <string>${fileGuardBaseDir}/FileGuard/Daemon/daemon</string>'>> $fgTmpLaunchDaemonPlist
+  echo '        <string>'$fileGuardBaseDir'/FileGuard/Daemon/daemon</string>'>> $fgTmpLaunchDaemonPlist
   echo '    </array>'                                           >> $fgTmpLaunchDaemonPlist
   echo '    <key>RunAtLoad</key>'                               >> $fgTmpLaunchDaemonPlist
   echo '    <false/>'                                           >> $fgTmpLaunchDaemonPlist
@@ -238,6 +248,17 @@ function _doCmdDelete()
               if [ "${currentWatchPaths[$element]}" == "$1" ];
                   then
                       unset newWatchPaths[$element]
+                      #
+                      # RFE: Purge files from FileGuard storage (untested example below).  
+                      #
+#                     if [ $PURGE_UNSET_WATCHPATHS -eq 1 ]; then
+#                         if [[ $newWatchPaths[$element] =~ ^/ ]];
+#                             then
+#                                 `/usr/bin/sudo /bin/rm ${fgStoragePath}$newWatchPaths[$element]`
+#                             else
+#                                 `/usr/bin/sudo /bin/rm ${fgExtensionsStoragePath}$newWatchPaths[$element]`
+#                     fi
+
                       echo "Notice: Watch path[${element}] now removed: ${1}"
                       local found=1
               fi
@@ -396,6 +417,11 @@ function _doCmdSync()
   #
   echo "Launch Deamon: Reloading..."
   `/usr/bin/sudo /bin/launchctl load /Library/LaunchDaemons/${DAEMON_LABEL}.plist`
+  #
+  # Restarting the launch daemon.
+  #
+  echo "Launch Deamon: Restarting..."
+  `/usr/bin/sudo /bin/launchctl start ${DAEMON_LABEL}`
 }
 
 #--------------------------------------------------------------------------------
