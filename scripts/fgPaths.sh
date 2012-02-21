@@ -3,7 +3,7 @@
 #
 # Administrator shell script (fgPaths.sh) to control the FileGuard WatchPaths
 #
-# Version 0.8 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 1.0 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 # Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
@@ -383,7 +383,15 @@ function _doCmdSync()
           #
           for element in $(seq 0 $((${#watchPaths[@]} -1)))
           do
-              `defaults write ${fgTmpLaunchDaemonPlist} WatchPaths -array-add ${watchPaths[$element]}`
+              #
+              # Full path given?
+              #
+              if [[ ${watchPaths[$element]} =~ ^/ ]];
+                  then # Yes. Add it (unmodified)
+                      `defaults write ${fgTmpLaunchDaemonPlist} WatchPaths -array-add ${watchPaths[$element]}`
+                  else # No. Default Extensions directory (add path).
+                      `defaults write ${fgTmpLaunchDaemonPlist} WatchPaths -array-add /System/Library/Extensions/${watchPaths[$element]}`
+              fi
           done
   fi
   #
