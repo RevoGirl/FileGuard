@@ -283,7 +283,7 @@ function _doCmdInit()
 
 #--------------------------------------------------------------------------------
 
-function _doCmdSetup
+function _doCmdSetup()
 {
   #
   # Check if config file exists, if yes then wipe it, else create the file. 
@@ -364,7 +364,7 @@ function _doCmdSync()
   `/usr/bin/sudo /bin/chmod 644 ${fgTmpLaunchDaemonPlist}`
   `/usr/bin/sudo /usr/sbin/chown root:wheel ${fgTmpLaunchDaemonPlist}`
   #
-  # Move synced file file to the right spot.
+  # Move synced file to the right spot.
   #
   `/usr/bin/sudo /bin/cp -p $fgTmpLaunchDaemonPlist $fgLaunchDaemonPlist`
   #
@@ -440,7 +440,7 @@ function _main()
 
 function _isRoot()
 {
-  if [ $(id -u) -ne 0 ]; then
+  if [ $(id -u) != 0 ]; then
       echo "This script must be run as root" 1>&2
       exit 1
   fi
