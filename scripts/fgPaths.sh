@@ -3,7 +3,7 @@
 #
 # Administrator shell script (fgPaths.sh) to control the FileGuard WatchPaths
 #
-# Version 1.0 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 1.1 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 # Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
@@ -22,15 +22,11 @@ fgTmpLaunchDaemonPlist=/tmp/com.fileguard.watcher.plist
 
 fgLaunchDaemonPlist=/Library/LaunchDaemons/com.fileguard.watcher.plist
 
-#
-# Next lines are for a new feature (in development / still untested).
-#
-
-PURGE_UNSET_WATCHPATHS=0
+PURGE_UNSET_WATCHPATHS=1
 
 fgStoragePath=${fileGuardBaseDir}/FileGuard/Files/
 
-fgStorageExtensionsPath=${fgStoragePath}Extensions/
+fgStorageExtensionsPath=${fgStoragePath}System/Library/Extensions/
 
 #=============================== LOCAL FUNCTIONS ================================
 
@@ -248,16 +244,23 @@ function _doCmdDelete()
               if [ "${currentWatchPaths[$element]}" == "$1" ];
                   then
                       unset newWatchPaths[$element]
-                      #
-                      # RFE: Purge files from FileGuard storage (untested example below).  
-                      #
-#                     if [ $PURGE_UNSET_WATCHPATHS -eq 1 ]; then
-#                         if [[ $newWatchPaths[$element] =~ ^/ ]];
-#                             then
-#                                 `/usr/bin/sudo /bin/rm ${fgStoragePath}$newWatchPaths[$element]`
-#                             else
-#                                 `/usr/bin/sudo /bin/rm ${fgExtensionsStoragePath}$newWatchPaths[$element]`
-#                     fi
+
+                      if [ $PURGE_UNSET_WATCHPATHS -eq 1 ]; then
+                          if [[ ${currentWatchPaths[$element]} =~ ^/ ]];
+                              then
+                                  #
+                                  # Check path: anything other than our storage (hard coded) will be blocked.
+                                  #
+                                  if [[ ${currentWatchPaths[$element]} =~ ^/Extra/FileGuard/Files/ ]];
+                                      then
+                                          `/usr/bin/sudo /bin/rm ${fgStoragePath}${currentWatchPaths[$element]}`
+                                      else
+                                          echo "ALERT: File removal outside of the FileGuard Storage blocked (check setup)!"
+                                  fi
+                              else
+                                  `/usr/bin/sudo /bin/rm -R ${fgStorageExtensionsPath}${currentWatchPaths[$element]}`
+                          fi
+                      fi
 
                       echo "Notice: Watch path[${element}] now removed: ${1}"
                       local found=1
@@ -434,7 +437,7 @@ function _doCmdSync()
 
 #--------------------------------------------------------------------------------
 
-function _main()
+function main()
 {
   local cmdAction=$1
 
@@ -484,8 +487,18 @@ function _main()
 }
 
 #--------------------------------------------------------------------------------
+
+function _toLowercase()
+{
+  #
+  # Please tell me that this can this be done in a little less ugly way!
+  #
+  echo "`echo $1 | tr '[A-Z]' '[a-z]'`"
+}
+
+#--------------------------------------------------------------------------------
 #
-# Only administrators (root) can run this script - hence the check for it here.
+# Only administrators (root) are allowed to run this script.
 #
 #--------------------------------------------------------------------------------
 
@@ -502,7 +515,12 @@ function _isRoot()
 #==================================== START =====================================
 
 if [ $(_isRoot) ]; then
-  _main $1 $2
+    if [[ "$2" =~ [add|delete] ]];
+        then
+            main $(_toLowercase $1) $2
+        else
+            main $(_toLowercase $1) $(_toLowercase $2)
+    fi
 fi
 
 exit 0
