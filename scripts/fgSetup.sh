@@ -4,7 +4,7 @@
 # Script (fgSetup.sh) to setup FileGuard directory structure, create the 
 # necessary directories and backing up files.
 #
-# Version 0.1 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.2 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 
 #set -x # Used for tracing errors (can be put anywhere in the script).
@@ -43,7 +43,7 @@ fgLaunchDaemonPlist=/Library/LaunchDaemons/com.fileguard.watcher.plist
 
 EXTENSIONS_DIR=/System/Library/Extensions/
 
-FILEGUARD_FILES=/Extra2/FileGuard/Files  # Do <em>not</em> add a forward slash!
+FILEGUARD_FILES=$fileGuardBaseDir/FileGuard/Files  # Do <em>not</em> add a forward slash!
 FILEGUARD_EXTENSIONS=${FILEGUARD_FILES}$EXTENSIONS_DIR
 
 #=============================== LOCAL FUNCTIONS ================================
@@ -188,8 +188,18 @@ function _showLine()
 }
 
 #--------------------------------------------------------------------------------
+
+function _toLowercase()
+{
+  #
+  # Please tell me that this can this be done in a little less ugly way!
+  #
+  echo "`echo $1 | tr '[A-Z]' '[a-z]'`"
+}
+
+#--------------------------------------------------------------------------------
 #
-# Only administrators (root) can run this script - hence the check for it here.
+# Only administrators (root) are allowed to run this script.
 #
 #--------------------------------------------------------------------------------
 
@@ -205,7 +215,7 @@ function _isRoot()
 
 #--------------------------------------------------------------------------------
 
-function _main()
+function main()
 {
   echo "\nFileGuard - setup started on:" `date "+%d-%m-%Y @ %H:%M:%S"`
   _showLine
@@ -219,8 +229,12 @@ function _main()
   # Check the FileGuard launch daemon plist (create and sync it when missing).
   #
   if [ $(_fileExists fgLaunchDaemonPlist) -eq 0 ]; then
+      echo "Calling script: /Extra/FileGuard/Scripts/fgPaths.sh setup\n"
       /usr/bin/sudo /Extra/FileGuard/Scripts/fgPaths.sh setup
+
       _showLine
+
+      echo "Calling script: /Extra/FileGuard/Scripts/fgPaths.sh sync\n"
       /usr/bin/sudo /Extra/FileGuard/Scripts/fgPaths.sh sync
   fi
 
@@ -245,7 +259,7 @@ function _main()
 #==================================== START =====================================
 
 if [ $(_isRoot) ]; then
-  _main $1
+  main $(_toLowercase $1)
 fi
 
 #================================================================================
