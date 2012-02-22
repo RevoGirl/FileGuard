@@ -3,7 +3,7 @@
 #
 # Administrator shell script (FileGuard.sh) to control the FileGuard LaunchDaemon
 #
-# Version 0.3 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.4 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 
 #set -x # Used for tracing errors (can be put anywhere in the script). 
@@ -11,6 +11,10 @@
 #================================= GLOBAL VARS ==================================
 
 DAEMON_LABEL=com.fileguard.watcher
+
+fgLaunchDaemonPlist=/Library/LaunchDaemons/com.fileguard.watcher.plist
+
+fgDaemonLogPath=/var/log/FileGuardDaemon.log
 
 #=============================== LOCAL FUNCTIONS ================================
 
@@ -28,7 +32,6 @@ function _doCmd()
   #
   if [[ $1 =~ load$ ]];
       then
-          echo $1
           sudo launchctl $1 /Library/LaunchDaemons/${DAEMON_LABEL}.plist
       else
           sudo launchctl $1 $DAEMON_LABEL
@@ -37,13 +40,52 @@ function _doCmd()
 
 #--------------------------------------------------------------------------------
 
+function _doCmdLogToggle()
+{
+  if [ "$1" == "on" ];
+      then
+          `/usr/bin/sudo /usr/bin/defaults write $fgLaunchDaemonPlist $2 $fgDaemonLogPath`
+      else
+          `/usr/bin/sudo /usr/bin/defaults delete $fgLaunchDaemonPlist $2`
+  fi
+
+  #
+  # Convert the file to human 'readable' XML format ('defaults' changed it).
+  #
+  `/usr/bin/sudo /usr/bin/plutil -convert xml1 ${fgLaunchDaemonPlist}`
+
+  #
+  # Silently stop, unload and load the daemon - activating the change.
+  #
+  _doCmd stop
+  _doCmd unload
+  _doCmd load
+}
+
+#--------------------------------------------------------------------------------
+
+function _doCmdDebugLog()
+{
+  if [ "$1" == "on" ];
+      then
+          _doCmdLogToggle on StandardErrorPath
+      elif [ "$1" == "off" ];
+          then
+              _doCmdLogToggle off StandardErrorPath
+          else
+              echo "Error: Invalid argument detected! Usage: debug <on/off>"
+  fi
+}
+
+#--------------------------------------------------------------------------------
+
 function _doCmdShow()
 {
-  if [ $1 == log ];
+  if [ "$1" == "log" ];
       then
           /usr/bin/sudo /bin/cat /var/log/FileGuardDaemon.log
       else
-          if [ $1 == watchlist ];
+          if [ "$1" == "watchlist" ];
               then
                   local watchPaths=(`defaults read /Library/LaunchDaemons/${DAEMON_LABEL}.plist WatchPaths | tr '\n' ' ' | sed 's/(//;s/ *//g;s/\"//g;s/,/ /g;s/)//'`)
                   #
@@ -63,6 +105,8 @@ function _doCmdShow()
                       else
                           echo "Error: No WatchPaths found (empty list)!"
                   fi
+              else
+                  echo "Error: Invalid argument detected! Usage: $0 show <log/watchlist>"
           fi
   fi
 }
@@ -71,7 +115,7 @@ function _doCmdShow()
 
 function _doCmdLog()
 {
-  if [ $1 == clean ];
+  if [ "$1" == "clean" ];
       then
           #
           # Remove log file.
@@ -86,18 +130,14 @@ function _doCmdLog()
           #
           echo "Log file now cleaned up"
       else
-          if [[ $1 == on || $1 == off ]];
+          if [ "$1" == "on" ]
               then
-                  echo "Sorry, but this command is not yet implemented!"
-                  #
-                  # RFE (low prio): Figure out how to do this.
-                  #
-                  #
-                  # <key>StandardErrorPath</key>
-                  # <key>StandardOutPath</key>
-                  # <string>/var/log/FileGuardDaemon.log<string>
-             else
-                  echo "Error: Invalid argument detected! Only <on/off> are valid arguments."
+                  _doCmdLogToggle on StandardOutPath
+          elif [ "$1" == "off" ];
+              then
+                  _doCmdLogToggle off StandardOutPath 
+              else
+                  echo "Error: Invalid argument detected! Usage: $0 log <on/off>"
           fi
   fi
 }
@@ -109,12 +149,21 @@ function main()
   local cmdAction=$1
 
   case $cmdAction in
+        debug)
+            _doCmdDebugLog $2 # Hidden features, because we may need the output!
+            ;;
+
         load)
             _doCmd $cmdAction
             ;;
          
         log)
-            _doCmdLog $2
+            if [ $2 ];
+                then
+                    _doCmdLog $2
+                else
+                    echo "Error: Argument missing! Usage: $0 log <on/off/clean>"
+            fi
             ;;
  
         remove)
@@ -122,7 +171,12 @@ function main()
             ;;
 
         show)
-            _doCmdShow $2
+            if [ $2 ];
+                then
+                    _doCmdShow $2
+                else
+                    echo "Error: Argument missing! Usage: $0 show <log/watchlist>"
+            fi
             ;;
 
         start)
@@ -148,12 +202,22 @@ function main()
 }
 
 #--------------------------------------------------------------------------------
+
+function _toLowercase()
+{
+  #
+  # Please tell me that this can this be done in a little less ugly way!
+  #
+  echo "`echo $1 | tr '[A-Z]' '[a-z]'`"
+}
+
+#--------------------------------------------------------------------------------
 #
 # Only administrators (root) are allowed to run this script.
 #
 #--------------------------------------------------------------------------------
 
-function isRoot()
+function _isRoot()
 {
   if [ $(id -u) != 0 ]; then
       echo "This script must be run as root (use sudo)" 1>&2
@@ -165,8 +229,11 @@ function isRoot()
 
 #==================================== START =====================================
 
-if [ $(isRoot) ]; then
-  main $1 $2
+if [ $(_isRoot) ]; then
+  #
+  # Call main routine, after converting the uppercase characters to lowercase.
+  #
+  main $(_toLowercase $1) $(_toLowercase $2)
 fi
 
 exit 0
