@@ -1,8 +1,8 @@
 #!/bin/sh
 #
-# Script (AppleIntelHD3000GraphicsFB) to patch the connector table data in AppleIntelSNBGraphicsFB
+# Script (AppleIntelSNBGraphicsFB) to patch the connector table data in AppleIntelSNBGraphicsFB
 #
-# Version 0.8 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.9 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 
 #
@@ -10,17 +10,34 @@
 #       expect to find "IGPU" in the ioreg output i.e. you have to fix your 
 #       ACPI tables, or it will fail (I hope to also find a workaround for this).
 
-#set -x # Used for tracing errors (can be put anywhere in the script).
+# set -x # Used for tracing errors (can be put anywhere in the script).
 
 #================================= GLOBAL VARS ==================================
 
 #
-# Set to 0 by default. Only meaningful for developers.
+# This data will be used for: sudo ./AppleIntelSNBGraphicsFB replace
+# <em>without</em> giving it the optional path/filename combo!
+#
+
+PLATFORM_INFO="0:
+0002 0300 0000 0000 FFFF FFFF
+0601 0000 0001 0000 0000 0000
+0205 0000 0002 0000 0700 0000
+0406 0000 0008 0000 0600 0000
+0000 0000 0100 0000 4000 0000"
+
+#
+# Set to 1 by default. Other values are currently still unsupported.
+#
+AUTO_USE_PLATFORM_INFO=1
+
+#
+# Set to 0 by default. Use 1 to output debug data (2 requires changes in main).
 #
 DEBUG=0
 
 #
-# Set to 0 by default. Eliminating the need of Xcode's nm
+# Set to 0 by default. Use 1 when you want to use Xcode's nm.
 #
 USE_NM=0
 
@@ -52,6 +69,18 @@ fi
 TARGET_FILE="${TARGET_PATH}${FILENAME}"
 
 #=============================== LOCAL FUNCTIONS ================================
+
+function _fileExists()
+{
+  if [ -e $1 ];
+      then
+          echo 1 # "File exists"
+      else
+          echo 0 # "File does not exist"
+  fi
+}
+
+#--------------------------------------------------------------------------------
 
 function _readFile()
 {
@@ -144,7 +173,7 @@ function _getDataSegmentOffset()
       #
       local segmentName=`echo ${commandHeader:16:12}`
 
-      if [ $DEBUG -eq 1 ]; then
+      if [ $DEBUG -eq 2 ]; then
           echo $commandHeader
           echo "Index: $index"
           echo "Command type: $commandType"
@@ -157,7 +186,7 @@ function _getDataSegmentOffset()
       #
       if [ $segmentName == $__DATA ];
           then
-              if [ $DEBUG -eq 1 ]; then
+              if [ $DEBUG -eq 2 ]; then
                   echo "__DATA segment located"
               fi
 
@@ -208,14 +237,14 @@ function _getDataSegmentOffset()
 
                   sectionName=`echo ${sectionHeader:0:12}`
 
-                  if [ $DEBUG -eq 1 ]; then
+                  if [ $DEBUG -eq 2 ]; then
                       echo "Section header: $sectionHeader"
                       echo "Section name  : $sectionName"
                   fi
 
                   if [ $sectionName == $__data ];
                       then
-                          if [ $DEBUG -eq 1 ]; then
+                          if [ $DEBUG -eq 2 ]; then
                               echo "__data section located"
                           fi
 
@@ -226,7 +255,7 @@ function _getDataSegmentOffset()
                                   dataOffset=$((`echo 0x${sectionHeader:102:2}${sectionHeader:100:2}${sectionHeader:98:2}${sectionHeader:96:2}`))
                           fi
 
-                          if [ $DEBUG -eq 1 ];
+                          if [ $DEBUG -eq 2 ];
                               then
                                   echo "Offset to data segment: $dataOffset"
                                   return
@@ -505,7 +534,7 @@ function _getConnectorTableNumberByBoardID()
           let tableNumber=4 
           ;;
 
-      Mac-742912EFDBEE19B3)	# MacBookAri4,2
+      Mac-742912EFDBEE19B3)	# MacBookAir4,2
           let tableNumber=4
           ;;
 
@@ -529,6 +558,7 @@ function main()
   # Copy arguments into local variables with a more self explanatory name.
   #
   local action=$1
+  local filename=$2
   local lipoData=(`lipo -detailed_info "${TARGET_FILE}"`)
 
   for item in $(seq 0 $((${#lipoData[@]} - 1)))
@@ -550,9 +580,9 @@ function main()
 
               if [ $DEBUG -eq 1 ];
                   then
-                      echo "Architecture: $architecture"
-                  else
-                      echo ""
+                      echo "\nArchitecture: $architecture"
+#                  else
+#                      echo ""
               fi
 
               if [ "$architecture" == "i386" ];
@@ -571,42 +601,73 @@ function main()
               let tableOffset=($(_getConnectorTableNumber) * 60)
               let skipBytes=($archOffset + $fileOffset + $connectorTableOffset + $tableOffset)
 
-              if [ $DEBUG -eq 0 ]; then
+              if [ $DEBUG -eq 1 ]; then
                   echo "Offset to architecture          : $archOffset"
                   echo "Size of Load Commands           : $sizeLoadCommands"
                   echo "File offset from LoadCommand    : $fileOffset"
                   echo "Offset to connector table       : $connectorTableOffset"
                   echo "Offset to target connector table: $tableOffset"
-                  echo "Connector table data for $architecture @ $skipBytes"
-                  echo "----------------------------------------"
               fi
 
               case $action in
                   auto)
-                      echo "This command is not yet implemented!"                      
+                      if $AUTO_USE_PLATFORM_INFO -eq 1 ]; then
+                          #
+                          # Automatic patching uses the in-script platform_info for patching.
+                          # Note: This isn't doing everything I have in mind, but at least this option is now doing something.
+                          #
+                          echo $PLATFORM_INFO | xxd -c 60 -r | dd of="$TARGET_FILE" bs=1 seek=$skipBytes conv=notrunc
+                      fi
                   ;;
 
                   extract)
-                      dd if="$TARGET_FILE" bs=1 skip=$skipBytes count=60 2> /dev/null | xxd -c 12 > /tmp/hd3000-$architecture
-                      cat /tmp/hd3000-$architecture
-                  ;;
-
-                  show)
-                      dd if="$TARGET_FILE" bs=1 skip=$skipBytes count=60 2> /dev/null | xxd -c 12
+                      echo "Connector table data for $architecture @ $skipBytes"
+                      echo "----------------------------------------"
+                      dd if="$TARGET_FILE" bs=1 skip=$skipBytes count=60 2> /dev/null | xxd -c 12 > /tmp/platform_info_data-$architecture
+                      cat /tmp/platform_info_data-$architecture
                   ;;
 
                   replace)
-                      echo "This command is not yet implemented!"
-#                      xxd -c 12 -r "$2" >! /tmp/hd3000_connector_table
-#                      dd if="$2" of="$TARGET_FILE" bs=1 seek=$skipBytes conv=notrunc
+                      echo "\nPatching arch: $architecture"
+                      echo "---------------------"
+                      #
+                      # Do we have a path file to work with?
+                      #
+                      if [ $filename ];
+                          then
+                              #
+                              # Yes. A path/filename was given, use it for patching.
+                              #
+                              xxd -c 12 -r "$filename" | dd of="$TARGET_FILE" bs=1 seek=$skipBytes conv=notrunc
+                          else
+                              #
+                              # Otherwise we're falling back on the in-script data (even faster).
+                              #
+                              echo $PLATFORM_INFO | xxd -c 60 -r | dd of="$TARGET_FILE" bs=1 seek=$skipBytes conv=notrunc
+                      fi
+                      echo "Done."
                   ;;
 
-                  *)
-                      echo "Unknown command given: $action"
+                  show)
+                      echo "Connector table data for $architecture @ $skipBytes"
+                      echo "----------------------------------------"
+                      dd if="$TARGET_FILE" bs=1 skip=$skipBytes count=60 2> /dev/null | xxd -c 12
+                  ;;
+ 
               esac
           ;;
       esac
   done
+}
+
+#--------------------------------------------------------------------------------
+
+function _toLowercase()
+{
+  #
+  # Please tell me that this can this be done in a little less ugly way!
+  #
+  echo "`echo $1 | tr '[A-Z]' '[a-z]'`"
 }
 
 #--------------------------------------------------------------------------------
@@ -626,10 +687,47 @@ function _isRoot()
 }
 
 #==================================== START =====================================
+ 
+#
+# Check number of arguments.
+#
+if [ $# -eq 0 ];
+    then
+        echo "Usage: sudo $0 {auto|extract|replace <path/filename>|show}"
+        exit 1
+    else
+        #
+        # We have at least one argument now, check if sudo was used (root user).
+        #
+        if [ $(_isRoot) ]; then
+            #
+            # Copy arguments into local variables with a more self explanatory name.
+            #
+            action=$(_toLowercase $1)
+            file="$2"
 
-# if [ $(_isRoot) ]; then
-  main $1 $2
-# fi
+            #
+            # Check number of arguments (replace accepts an optional path/filename).
+            #
+            if [[ $action == "replace" && $# -eq 2 ]]; then
+                #
+                # First check if the file exists.
+                #
+                if [ ! -e $file ]; then
+                    #
+                    # No. Bark and bail out.
+                    #
+                    echo "Error: File Not Found!"
+                    exit 1
+               fi
+            fi
+
+            #
+            # Everything appears to be fine, fire up the main routine.
+            #
+            main $action $file
+        fi
+fi
 
 #================================================================================
 
