@@ -611,7 +611,7 @@ function main()
 
               case $action in
                   auto)
-                      if $AUTO_USE_PLATFORM_INFO -eq 1 ]; then
+                      if [ $AUTO_USE_PLATFORM_INFO -eq 1 ]; then
                           #
                           # Automatic patching uses the in-script platform_info for patching.
                           # Note: This isn't doing everything I have in mind, but at least this option is now doing something.
