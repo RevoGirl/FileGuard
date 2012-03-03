@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Script (AppleHDA) to patch AppleHDA so that it works with Mountain Lion DP1
+#
+# Version 0.1 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+#
+
+#set -x # Used for tracing errors (can be put anywhere in the script).
+
+#================================= GLOBAL VARS ==================================
+
+targetVolume="/Volumes/Mountain Lion"
+
+FILENAME="/AppleHDA.kext/Contents/MacOS/AppleHDA"
+
+#
+# Check if FileGuard is setup.
+#
+if [ -d /Extra/FileGuard/Files/System/Library/Extensions ];
+    then
+        #
+        # Yes, then use that path.
+        #
+        TARGET_PATH="${targetVolume}/Extra/FileGuard/Files/System/Library/Extensions"
+    else
+        #
+        # No, use the normal extensions path.
+        #
+        TARGET_PATH="${targetVolume}/System/Library/Extensions"
+fi
+
+TARGET_FILE="${TARGET_PATH}${FILENAME}"
+
+#=============================== LOCAL FUNCTIONS ================================
+
+function _notAlreadyPatched()
+{
+  echo 1 # RFE: Implement me.
+}
+
+#--------------------------------------------------------------------------------
+
+function main()
+{
+  if [ _notAlreadyPatched -eq 1 ]; then
+    /usr/bin/perl -pi -e 's|\xff\x87\xec\x1a|\x92\x08\xec\x10|g' $TARGET_FILE
+    /usr/bin/perl -pi -e 's|\x74\x19\xad\x15|\x98\x08\xec\x10|g' $TARGET_FILE
+
+    /usr/bin/perl -pi -e 's|\x0f\x8f\x2f\x02\x00\x00|\x0f\x84\xfb\x03\x00\x00|g' $TARGET_FILE
+    /usr/bin/perl -pi -e 's|\x0f\x8f\xa5\x03\x00\x00|\x0f\x84\xef\x03\x00\x00|g' $TARGET_FILE
+
+    /usr/bin/perl -pi -e 's|\x0f\x8f\x16\x02\x00\x00|\x0f\x84\xb4\x03\x00\x00|g' $TARGET_FILE
+    /usr/bin/perl -pi -e 's|\x0f\x8f\x5e\x03\x00\x00|\x0f\x84\xa8\x03\x00\x00|g' $TARGET_FILE
+
+    /usr/bin/perl -pi -e 's|\x0f\x8f\x06\x02\x00\x00|\x0f\x84\x86\x03\x00\x00|g' $TARGET_FILE
+    /usr/bin/perl -pi -e 's|\x0f\x8f\x30\x03\x00\x00|\x0f\x84\x7b\x03\x00\x00|g' $TARGET_FILE
+
+    /usr/bin/perl -pi -e 's|\x0f\x8f\xf0\x01\x00\x00|\x0f\x84\x5e\x03\x00\x00|g' $TARGET_FILE
+    /usr/bin/perl -pi -e 's|\x0f\x8f\x08\x03\x00\x00|\x0f\x84\x53\x03\x00\x00|g' $TARGET_FILE
+  fi
+}
+
+#--------------------------------------------------------------------------------
+#
+# Only administrators (root) are allowed to run this script.
+#
+#--------------------------------------------------------------------------------
+
+function _isRoot()
+{
+  if [ $(id -u) != 0 ]; then
+      echo "This script must be run as root" 1>&2
+      exit 1
+  fi
+
+  echo 1
+}
+
+#==================================== START =====================================
+
+if [ $(_isRoot) ]; then
+  main
+fi
+
+#================================================================================
+
+exit 0
