@@ -9,8 +9,8 @@
 
 #================================= GLOBAL VARS ==================================
 
-targetVolume="/Volumes/Mountain Lion"
-#targetVolume=""
+#targetVolume="/Volumes/Mountain Lion"
+targetVolume=""
 
 FILENAME="/AppleHDA.kext/Contents/MacOS/AppleHDA"
 
