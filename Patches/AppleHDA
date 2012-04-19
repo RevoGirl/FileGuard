@@ -1,21 +1,22 @@
 #!/bin/sh
 #
-# Script (AppleHDA) to patch AppleHDA so that it works with Mountain Lion DP1/2
+# Script (AppleHDA) to patch AppleHDA so that it works with Mountain Lion DP1/2/3
 #
-# Version 0.3 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.4 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
 #
 
 #set -x # Used for tracing errors (can be put anywhere in the script).
 
 #================================= GLOBAL VARS ==================================
 
-#targetVolume="/Volumes/Mountain Lion"
-targetVolume=""
+targetVolume="/Volumes/Mountain Lion"
+#targetVolume=""
 
 FILENAME="/AppleHDA.kext/Contents/MacOS/AppleHDA"
 
 DP1=2.2.0a22
 DP2=2.2.7a4
+DP3=2.3.0a22
 
 #
 # Check to see if FileGuard is setup.
@@ -49,6 +50,12 @@ function _notAlreadyPatched()
         ;;
 
         $DP2)
+            if [[ `/usr/bin/grep -P '\x92\x08\xec\x10\x0f\x84\xc4\x03\x00\x00' "$TARGET_FILE"` =~ $TARGET_FILE ]]; then
+                 return 0
+            fi
+        ;;
+
+        $DP3)
             if [[ `/usr/bin/grep -P '\x92\x08\xec\x10\x0f\x84\xc4\x03\x00\x00' "$TARGET_FILE"` =~ $TARGET_FILE ]]; then
                  return 0
             fi
@@ -100,7 +107,7 @@ function main()
   fi
 
   if [[ $(_checkVersion $DP2) -eq 1 ]]; then
-      echo "Target file: Mountain Lion DP1 v$DP1"
+      echo "Target file: Mountain Lion DP2 v$DP2"
 
       if [[ $(_notAlreadyPatched $DP2) -eq 1 ]];
           then
@@ -114,6 +121,32 @@ function main()
               /usr/bin/perl -pi -e 's|\xff\x87\xec\x1a\x0f\x8f\xa7\x01\x00\x00|\x92\x08\xec\x10\x0f\x84\x68\x03\x00\x00|g' $TARGET_FILE
               /usr/bin/perl -pi -e 's|\x74\x19\xad\x15\x0f\x8f\x77\x01\x00\x00|\x98\x08\xec\x10\x0f\x84\x5d\x03\x00\x00|g' $TARGET_FILE
 
+              /usr/bin/perl -pi -e 's|\xff\x87\xec\x1a\x0f\x8f\x91\x01\x00\x00|\x92\x08\xec\x10\x0f\x84\x4a\x03\x00\x00|g' $TARGET_FILE
+              /usr/bin/perl -pi -e 's|\x74\x19\xad\x15\x0f\x8f\x61\x01\x00\x00|\x98\x08\xec\x10\x0f\x84\x3f\x03\x00\x00|g' $TARGET_FILE
+          else
+              echo "Error: File is already patched!"
+      fi
+  fi
+
+  if [[ $(_checkVersion $DP3) -eq 1 ]]; then
+      echo "Target file: Mountain Lion DP3 v$DP3"
+
+      if [[ $(_notAlreadyPatched $DP3) -eq 1 ]];
+          then
+              echo "Both 32-bit and 64-bit code patched."
+              # (32-bit) AppleHDAFunctionGroupFactory::createAppleHDAFunctionGroup(DevIdStruct*)
+              /usr/bin/perl -pi -e 's|\xff\x87\xec\x1a\x0f\x8f\xba\x01\x00\x00|\x92\x08\xec\x10\x0f\x84\xc4\x03\x00\x00|g' $TARGET_FILE
+              /usr/bin/perl -pi -e 's|\x74\x19\xad\x15\x0f\x8f\x87\x01\x00\x00|\x98\x08\xec\x10\x0f\x84\xb8\x03\x00\x00|g' $TARGET_FILE
+
+              # (32-bit) AppleHDAWidgetFactory::createAppleHDAWidget(DevIdStruct*)
+              /usr/bin/perl -pi -e 's|\xff\x87\xec\x1a\x0f\x8f\xa1\x01\x00\x00|\x92\x08\xec\x10\x0f\x84\x88\x03\x00\x00|g' $TARGET_FILE
+              /usr/bin/perl -pi -e 's|\x74\x19\xad\x15\x0f\x8f\x6e\x01\x00\x00|\x98\x08\xec\x10\x0f\x84\x7c\x03\x00\x00|g' $TARGET_FILE
+
+              # (64-bit) AppleHDAFunctionGroupFactory::createAppleHDAFunctionGroup(DevIdStruct*)
+              /usr/bin/perl -pi -e 's|\xff\x87\xec\x1a\x0f\x8f\xa7\x01\x00\x00|\x92\x08\xec\x10\x0f\x84\x68\x03\x00\x00|g' $TARGET_FILE
+              /usr/bin/perl -pi -e 's|\x74\x19\xad\x15\x0f\x8f\x77\x01\x00\x00|\x98\x08\xec\x10\x0f\x84\x5d\x03\x00\x00|g' $TARGET_FILE
+
+              # (64-bit) AppleHDAWidgetFactory::createAppleHDAWidget(DevIdStruct*)
               /usr/bin/perl -pi -e 's|\xff\x87\xec\x1a\x0f\x8f\x91\x01\x00\x00|\x92\x08\xec\x10\x0f\x84\x4a\x03\x00\x00|g' $TARGET_FILE
               /usr/bin/perl -pi -e 's|\x74\x19\xad\x15\x0f\x8f\x61\x01\x00\x00|\x98\x08\xec\x10\x0f\x84\x3f\x03\x00\x00|g' $TARGET_FILE
           else
