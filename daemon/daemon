@@ -3,7 +3,7 @@
 # Script (daemon) to restore files from the FileGuard storage, after they
 # have been removed and/or replaced by the OS X installer.
 #
-# Version 0.7 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.7 - Copyright (c) 2012 by RevoGirl <RevoGirl@rocketmail.com>
 #
 
 #
