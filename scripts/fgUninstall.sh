@@ -4,7 +4,7 @@
 # Script (fgUninstall.sh) to uninstall FileGuard, meaning that it will remove 
 # all files, directories, the FileGuard daemon and log- and configuration files.
 #
-# Version 0.1 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.1 - Copyright (c) 2012 by RevoGirl <RevoGirl@rocketmail.com>
 #
 
 #set -x # Used for tracing errors (can be put anywhere in the script).
