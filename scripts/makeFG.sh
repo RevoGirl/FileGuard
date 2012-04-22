@@ -4,7 +4,7 @@
 # Script (makeFG.sh) to create the FileGuard directory structure, 
 # and to backup certain essential files required by OS X.
 #
-# Version 0.9 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.9 - Copyright (c) 2012 by RevoGirl <RevoGirl@rocketmail.com>
 #
 # Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
