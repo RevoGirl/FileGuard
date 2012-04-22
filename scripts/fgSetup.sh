@@ -4,7 +4,7 @@
 # Script (fgSetup.sh) to setup FileGuard directory structure, create the 
 # necessary directories and backing up files.
 #
-# Version 0.2 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.2 - Copyright (c) 2012 by RevoGirl <RevoGirl@rocketmail.com>
 #
 
 #set -x # Used for tracing errors (can be put anywhere in the script).
