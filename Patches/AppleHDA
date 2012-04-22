@@ -2,7 +2,7 @@
 #
 # Script (AppleHDA) to patch AppleHDA so that it works with Mountain Lion DP1/2/3
 #
-# Version 0.4 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.4 - Copyright (c) 2012 by RevoGirl <RevoGirl@rocketmail.com>
 #
 
 #set -x # Used for tracing errors (can be put anywhere in the script).
