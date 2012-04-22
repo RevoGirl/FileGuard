@@ -3,7 +3,7 @@
 #
 # Administrator shell script (FileGuard.sh) to control the FileGuard LaunchDaemon
 #
-# Version 0.4 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 0.4 - Copyright (c) 2012 by RevoGirl <RevoGirl@rocketmail.com>
 #
 
 #set -x # Used for tracing errors (can be put anywhere in the script). 
