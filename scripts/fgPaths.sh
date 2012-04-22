@@ -3,7 +3,7 @@
 #
 # Administrator shell script (fgPaths.sh) to control the FileGuard WatchPaths
 #
-# Version 1.1 - Copyright (c) 2012 by RevoGirl <DutchHockeyGoalie@yahoo.com>
+# Version 1.1 - Copyright (c) 2012 by RevoGirl <RevoGirl@rocketmail.com>
 #
 # Contributors: Geoff (STLVNUB) who helped me with _setLayoutID()
 #
