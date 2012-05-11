@@ -230,7 +230,7 @@ function _createLaunchDaemonPlist()
   echo '    <string>/var/log/FileGuardDaemon.log</string>'      >> /tmp/com.fileguard.watcher.plist
   echo '    <key>StandardOutPath</key>'                         >> /tmp/com.fileguard.watcher.plist
   echo '    <string>/var/log/FileGuardDaemon.log</string>'      >> /tmp/com.fileguard.watcher.plist
-  echo '</dict>							>> /tmp/com.fileguard.watcher.plist
+  echo '</dict>'						>> /tmp/com.fileguard.watcher.plist
   echo '</plist>'						>> /tmp/com.fileguard.watcher.plist
 
   #
